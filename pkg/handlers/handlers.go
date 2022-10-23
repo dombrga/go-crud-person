@@ -4,19 +4,18 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"log"
 	"net/http"
 	"strconv"
 	"time"
 
+	"github.com/dombrga/go-crud-person/pkg/constants"
+	"github.com/dombrga/go-crud-person/pkg/helpers"
+	"github.com/dombrga/go-crud-person/pkg/models"
 	"github.com/go-playground/validator/v10"
 	"github.com/gorilla/mux"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/bson/primitive"
 	"go.mongodb.org/mongo-driver/mongo"
-	"practice.com/mongodb-crud/pkg/constants"
-	"practice.com/mongodb-crud/pkg/helpers"
-	"practice.com/mongodb-crud/pkg/models"
 )
 
 func HandleGetPersons(client *mongo.Client) http.HandlerFunc {
@@ -36,10 +35,6 @@ func HandleGetPersons(client *mongo.Client) http.HandlerFunc {
 
 		if isIncludeDeleted {
 			filter = bson.M{}
-			// filter = bson.M{"$or": []interface{}{
-			// 	bson.M{"isSoftDeleted": true},
-			// 	bson.M{"isSoftDeleted": false},
-			// }}
 		}
 
 		// container of persons
@@ -47,19 +42,19 @@ func HandleGetPersons(client *mongo.Client) http.HandlerFunc {
 
 		// db
 		var collection = client.Database(constants.DATABASE).Collection(constants.PERSONS_COLLECTION)
-		var ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+		var ctx, cancel = helpers.CreateContext()
 		defer cancel()
 
 		// find all persons
 		var cursor, err = collection.Find(ctx, filter)
 
 		if err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 
 		// decode
 		if err = cursor.All(context.TODO(), &persons); err != nil {
-			log.Fatal(err)
+			panic(err)
 		}
 
 		// send result
@@ -86,7 +81,7 @@ func HandleGetPerson(client *mongo.Client) http.HandlerFunc {
 
 		// db
 		var collection = client.Database(constants.DATABASE).Collection(constants.PERSONS_COLLECTION)
-		var ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+		var ctx, cancel = helpers.CreateContext()
 		defer cancel()
 
 		// find
@@ -97,14 +92,12 @@ func HandleGetPerson(client *mongo.Client) http.HandlerFunc {
 				json.NewEncoder(res).Encode("No person found by this ID.")
 				return
 			}
-			log.Fatal(err)
+			panic(err)
 		}
 
 		json.NewEncoder(res).Encode(person)
 	}
 }
-
-var validate = validator.New()
 
 func HandleCreatePerson(client *mongo.Client) http.HandlerFunc {
 
@@ -127,9 +120,9 @@ func HandleCreatePerson(client *mongo.Client) http.HandlerFunc {
 		person.IsSoftDeleted = false
 
 		// validate body
-		var bodyErr = validate.Struct(person)
-		if bodyErr != nil {
-			var validationErrors = bodyErr.(validator.ValidationErrors)
+		var structErr = helpers.ValidateBody(person)
+		if structErr != nil {
+			var validationErrors = structErr.(validator.ValidationErrors)
 			var errorTranslated = helpers.TranslateErrors(validationErrors)
 			json.NewEncoder(res).Encode(errorTranslated)
 			return
@@ -141,8 +134,7 @@ func HandleCreatePerson(client *mongo.Client) http.HandlerFunc {
 		defer cancel()
 
 		// insert new person to db
-		var insertResult, err = collection.InsertOne(ctx, person)
-		fmt.Println("insert result:", insertResult)
+		var _, err = collection.InsertOne(ctx, person)
 		if err != nil {
 			panic(err)
 		}
@@ -159,6 +151,7 @@ func HandleCreatePerson(client *mongo.Client) http.HandlerFunc {
 func HandleUpdatePerson(client *mongo.Client) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		fmt.Println("Updating...")
+
 		res.Header().Add("Content-Type", "application/json")
 
 		// get person id
@@ -174,7 +167,7 @@ func HandleUpdatePerson(client *mongo.Client) http.HandlerFunc {
 		json.NewDecoder(req.Body).Decode(&person)
 
 		var collection = client.Database(constants.DATABASE).Collection(constants.PERSONS_COLLECTION)
-		var ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+		var ctx, cancel = helpers.CreateContext()
 		defer cancel()
 
 		// for update
@@ -184,7 +177,6 @@ func HandleUpdatePerson(client *mongo.Client) http.HandlerFunc {
 				"lastName":  person.LastName,
 				"birthdate": person.Birthdate,
 			}}
-		fmt.Println("update:", update)
 
 		// call update
 		var updateResult, updateErr = collection.UpdateByID(ctx, id, update)
@@ -220,7 +212,7 @@ func HandleSoftDeletePerson(client *mongo.Client) http.HandlerFunc {
 
 		// db
 		var collection = client.Database(constants.DATABASE).Collection(constants.PERSONS_COLLECTION)
-		var ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+		var ctx, cancel = helpers.CreateContext()
 		defer cancel()
 
 		// filter
@@ -248,6 +240,7 @@ func HandleSoftDeletePerson(client *mongo.Client) http.HandlerFunc {
 func HandleHardDeletePerson(client *mongo.Client) http.HandlerFunc {
 	return func(res http.ResponseWriter, req *http.Request) {
 		fmt.Println("Deleting...")
+
 		res.Header().Add("Content-Type", "application/json")
 
 		// params
@@ -259,7 +252,7 @@ func HandleHardDeletePerson(client *mongo.Client) http.HandlerFunc {
 		}
 
 		var collection = client.Database(constants.DATABASE).Collection(constants.PERSONS_COLLECTION)
-		var ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+		var ctx, cancel = helpers.CreateContext()
 		defer cancel()
 
 		// filter
@@ -286,7 +279,7 @@ func GetPersons(client *mongo.Client) []models.Person {
 	var persons []models.Person
 
 	var collection = client.Database(constants.DATABASE).Collection(constants.PERSONS_COLLECTION)
-	var ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	var ctx, cancel = helpers.CreateContext()
 	defer cancel()
 
 	// filter

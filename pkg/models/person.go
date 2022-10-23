@@ -7,7 +7,6 @@ type PersonRequest struct {
 	LastName      string `json:"lastName,omitempty" bson:"lastName,omitempty" validate:"required"`
 	Birthdate     string `json:"birthdate,omitempty" bson:"birthdate,omitempty" validate:"required"`
 	IsSoftDeleted bool   `json:"isSoftDeleted" bson:"isSoftDeleted"`
-	// IsSoftDeleted *bool  `json:"isSoftDeleted,omitempty" bson:"isSoftDeleted,omitempty"`
 }
 
 type Person struct {
